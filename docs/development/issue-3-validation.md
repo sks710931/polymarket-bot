@@ -25,6 +25,8 @@ Validated on **2026-10-17 (Asia/Calcutta)** on the target Windows checkout, reba
 
 ## Behavioral evidence
 
+A fresh source archive of commit `9069ac4` was extracted to an ignored validation directory with no existing `node_modules` or build output. A frozen offline install linked all 188 packages from the verified local pnpm store, then `pnpm check` passed in that directory: lint, formatting, strict types, server/library compilation, Vite bundle and all 18 tests. The pnpm store was reused only as a package-download cache; generated application files were not copied from the original checkout.
+
 Boundary tests accept the real scaffold and reject browser imports of SDK/server/persistence, cross-workspace relative paths, uncheckable dynamic imports, domain framework/Node imports, application-to-persistence edges, direct server SDK access, private package subpaths, dependency aliases, unused forbidden manifest dependencies, browser environment/credential references and known writer/paper identifiers.
 
 The server test creates an unbound Fastify instance, asserts OBSERVE mode and three read-only **not-configured** descriptors, then uses in-process injection to verify representative order submission, live arm/start and paper start routes return 404. No network listener or provider call is needed. Readiness is also absent rather than reporting a fabricated healthy integration.
