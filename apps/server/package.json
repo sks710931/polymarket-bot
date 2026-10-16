@@ -1,0 +1,25 @@
+{
+  "name": "@desk/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@desk/domain": "workspace:*",
+    "@desk/application": "workspace:*",
+    "@desk/polymarket-adapter": "workspace:*",
+    "@desk/market-data": "workspace:*",
+    "@desk/persistence": "workspace:*",
+    "@desk/shared-contracts": "workspace:*",
+    "fastify": "5.12.7"
+  }
+}
