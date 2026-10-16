@@ -42,14 +42,18 @@ Six capabilities: (1) account-connected live dashboard, (2) probabilistic fair-v
 | Exchange integration | `@polymarket/client` pinned, behind typed adapters | Official SDK for public/secure flows. Revalidate SDK/endpoint compatibility before I6. |
 | Database | Local **Microsoft SQL Server**, Windows Integrated Authentication where supported by the chosen Node driver | Preserves preferred local DB; implement an early connectivity proof. Use decimal SQL types, migrations, unique constraints and transactions. Avoid shipping a password in config. |
 | High-volume telemetry | Bounded short-retention compressed files (Parquet optional), SQL for authoritative state | Forward evaluation needs reproducible recent decisions, not unlimited full historical archiving. |
-| Real-time UI | Server-Sent Events or authenticated WebSocket (choose one in I1) | Server reconciles feeds and coalesces browser updates; avoid direct browser exchange-credential use. |
+| Real-time UI | **Server-Sent Events**, two same-origin streams (public and owner session). WebSocket is not used. [ADR 0005](docs/adr/0005-server-sent-events-transport.md) | Server reconciles feeds and coalesces browser updates; avoid direct browser exchange-credential use. |
 | Background jobs | In-process supervised workers, bounded queues, monotonic timeouts | No Kafka, Redis, cloud, Kubernetes or GPU required. |
 | Modeling | Causal analytical stochastic model, optional simple calibrated logistic correction | Transparent and efficient; do not train large neural nets first. |
-| Deployment | Local Windows PC, loopback HTTPS for initial build | Single operator; non-loopback exposure requires explicit security review. |
+| Deployment | Local Windows PC. Fastify terminates HTTPS on **`https://127.0.0.1:8443` only**. [ADR 0004](docs/adr/0004-loopback-https-single-origin.md) | Single operator and one browser origin. `localhost` is a different origin and is not the desk URL. Non-loopback exposure requires a new ADR and security review. |
 | Autonomous signing | **Pluggable, initially unavailable**; investigate eligible scoped session key vs dedicated restricted signer | CLOB L2 keys alone are not order-signing keys. Never export MetaMask private key. |
 | Financial arithmetic | Exact fixed-point/decimal (SQL `DECIMAL`, TypeScript decimal library or bigint-scaled amounts) | No JS floating point for cash, fee, share or ledger totals. Floating point acceptable for statistical inference only. |
 
-**SDK/OS proof in I1:** verify runtime SDK can read existing L2 credentials *without* requiring a live private signer; if its secure client requires signing, use supported read-only L2 HMAC adapter or an explicit typed direct API wrapper just for private reads. Do **not** create dummy private keys. Verify the Windows integrated driver can connect to SQL Server under the intended process identity, otherwise present a documented alternate credential mechanism without logging it. The CLI and host must fail clearly rather than silently fallback to a different DB.
+**I1 decision record:** [docs/adr/](docs/adr/) accepts the single Fastify process, React/Vite shell, pnpm workspace, SQL Server Windows-identity intent, loopback origin, SSE transport, public-read matrix, and OBSERVE-only composition. Those records do not authorize order signing, exchange writes, paper execution, forecasts, or non-loopback hosting. SDK and driver behavior are proof obligations, not facts already demonstrated.
+
+**Development-only helper:** A separate loopback Vite process may serve frontend assets behind Fastify in dev mode. It is not a second application backend or browser origin. Fastify retains API, health, and SSE handling and strips credential-bearing request headers and upstream `Set-Cookie` headers at the development proxy boundary ([ADR 0001](docs/adr/0001-single-fastify-process.md), [ADR 0004](docs/adr/0004-loopback-https-single-origin.md)). Start mode serves built assets in the single Fastify process.
+
+**SDK/OS proof in I1:** verify runtime SDK can read existing L2 credentials *without* requiring a live private signer; if its secure client requires signing, use supported read-only L2 HMAC adapter or an explicit typed direct API wrapper just for private reads. Do **not** create dummy private keys. Choose the Node SQL driver only after a Windows-integrated smoke test under the intended process identity; otherwise present a documented alternate credential mechanism without logging it ([ADR 0003](docs/adr/0003-sql-server-windows-identity.md), [ADR 0007](docs/adr/0007-i1-observe-boundaries-and-sdk-proof.md)). The CLI and host must fail clearly rather than silently fallback to a different DB.
 
 ### 2.1 Official compatibility facts to recheck at implementation time
 
@@ -66,7 +70,7 @@ Six capabilities: (1) account-connected live dashboard, (2) probabilistic fair-v
 ```mermaid
 flowchart TD
     MetaMask["MetaMask browser signer"] --> Web["React operator console"]
-    Web <--> API["Fastify API + authenticated stream"]
+    Web <--> API["Fastify API + SSE streams"]
     Poly["Polymarket Gamma/CLOB/Data/PolyBolt optional"] --> Adapter["Polymarket SDK/transport adapter"]
     BTC["Public BTC venue feeds"] --> Feed["BTC feed adapter"]
     Adapter --> Market["Market catalog + normalized snapshots"]
@@ -295,23 +299,25 @@ No assumption that publishing a quote fills it; no exchange trades counted merel
 - Operator controls: `Pause`, `Stop`, `Halt`, restart data collector (not order retry), configure paper account, view incident timeline; all audited and idempotent. Dashboard reconnect must re-fetch authoritative backend state.
 - Backups: local encrypted DB backup/snapshot policy and tested restore; secrets excluded; backups do not impersonate current live account state without exchange reconciliation.
 - Telemetry: structured redacted logs, meaningful metrics (feed age/gaps, model latency, risk rejects, unknown orders, performance), correlation IDs across forecast -> proposal -> intent -> fill -> ledger. Bounded storage and retention with disk-low read-only safety.
-- Security: localhost binding and TLS; wallet challenge origin checks; server-session HttpOnly+Secure+SameSite, CSRF tokens on control mutations; CSP, input validation, rate limits, SQL least privilege, no arbitrary order API, audit permissions, pinned dependencies, SDK/version review.
+- Security: bind `127.0.0.1` only and TLS at the single origin in [ADR 0004](docs/adr/0004-loopback-https-single-origin.md); wallet challenge origin checks; server-session HttpOnly+Secure+SameSite, CSRF tokens on control mutations; CSP, input validation, rate limits, SQL least privilege, no arbitrary order API, audit permissions, pinned dependencies, SDK/version review. Anonymous routes are only the public-read set in [ADR 0006](docs/adr/0006-public-read-access-boundary.md).
 
 ## 13. Functional APIs and GUI streaming
 
-All internal `/api/v1` endpoints require owner session unless explicitly public health with non-sensitive output. Models are typed and generated from an OpenAPI schema. Control endpoints require CSRF. Sample contracts:
+Application routes use the `/api/v1` prefix. Process probes stay at `/health/live` and `/health/ready`. Owner session is required for every `/api/v1` route except the narrow anonymous set in [ADR 0006](docs/adr/0006-public-read-access-boundary.md): login challenge bootstrap, and non-sensitive market, book, and public feed-health reads. Anonymous bodies contain no account, credential, operator, incident, or host-environment detail, so a pre-login browser can show public markets (UX §§3–4) without opening the rest of the API. Health probes are anonymous and coarse. Control mutations require the owner session and CSRF. GUI streaming is Server-Sent Events on a public stream and a separate session stream ([ADR 0005](docs/adr/0005-server-sent-events-transport.md)). Models are typed and generated from an OpenAPI schema. Sample contracts:
 
 | Capability | Endpoints / events | Available iteration |
 |---|---|---|
-| Authentication | `/auth/challenge`, `/auth/verify`, `/auth/session`, `/auth/logout` | I1 |
-| Integrations | `/integrations/status`, `/account/identity`, `/account/balance`, `/account/positions`, `/account/orders` | I1 |
-| Markets | `/markets/current`, `/markets/upcoming`, `/markets/{id}`, `/markets/{id}/book`, `/feeds/health` | I1 |
-| Forecasts | `/markets/{id}/forecast`, `/models/health`, `/models/evaluations` | I2 |
-| Opportunities | `/markets/{id}/opportunities`, `/risk/policy`, `/risk/decisions` | I3 |
-| Trading | `/trading/status`, `/trading/runs`, `/orders`, `/fills`, `/ledger`, `/portfolio`, `/incidents` | I4 scaffolding; paper real in I5 |
-| Paper | `/paper/accounts`, `/paper/runs/start`, `/paper/runs/pause`, `/paper/runs/stop`, `/paper/summary` | I5 |
-| Live control | `/live/eligibility`, `/live/arm`, `/live/start`, `/live/pause`, `/live/halt` | I6 only |
-| Realtime | `market.snapshot`, `feed.health`, `forecast.updated`, `opportunity.updated`, `run.status`, `order.updated`, `portfolio.updated`, `incident.raised` | Respective iteration |
+| Health | `GET /health/live`, `GET /health/ready` (anonymous, non-sensitive) | I1 |
+| Authentication | `/api/v1/auth/challenge`, `/api/v1/auth/verify`, `/api/v1/auth/session`, `/api/v1/auth/logout` | I1 |
+| Integrations | `/api/v1/integrations/status`, `/api/v1/integrations/eligibility`, `/api/v1/account/identity`, `/api/v1/account/balance`, `/api/v1/account/positions`, `/api/v1/account/orders` (session; balances and orders only after verified mapping) | I1 |
+| Markets | `/api/v1/markets/current`, `/api/v1/markets/upcoming`, `/api/v1/markets/{id}`, `/api/v1/markets/{id}/book`, `/api/v1/feeds/health` (anonymous public reads) | I1 |
+| Incidents and collector control | `GET /api/v1/incidents`, `POST /api/v1/feeds/reconnect` (session; POST also CSRF) | I1 |
+| Forecasts | `/api/v1/markets/{id}/forecast`, `/api/v1/models/health`, `/api/v1/models/evaluations` | I2; not registered in I1 |
+| Opportunities | `/api/v1/markets/{id}/opportunities`, `/api/v1/risk/policy`, `/api/v1/risk/decisions` | I3; not registered in I1 |
+| Trading | `/api/v1/trading/status`, `/api/v1/trading/runs`, `/api/v1/orders`, `/api/v1/fills`, `/api/v1/ledger`, `/api/v1/portfolio` | I4 scaffolding; paper real in I5; not registered in I1 |
+| Paper | `/api/v1/paper/accounts`, `/api/v1/paper/runs/start`, `/api/v1/paper/runs/pause`, `/api/v1/paper/runs/stop`, `/api/v1/paper/summary` | I5; not registered in I1 |
+| Live control | `/api/v1/live/eligibility`, `/api/v1/live/arm`, `/api/v1/live/start`, `/api/v1/live/pause`, `/api/v1/live/halt` | I6 only; not registered in I1 |
+| Realtime | Public SSE `market.snapshot` and `feed.health`; session SSE for account, integration, and incident snapshots. `forecast.updated`, `opportunity.updated`, `run.status`, `order.updated`, `portfolio.updated` arrive with their iteration | I1 streams as in ADR 0005; later events are not registered in I1 |
 
 Only authorized backend methods can act on trade proposals. REST/UI may **not** supply arbitrary token/quantity/price to bypass model/risk and submit orders. If manual liquidation is later needed, give it a separately designed, fully checked endpoint and audit workflow, not a generic raw order proxy.
 
@@ -340,7 +346,7 @@ Only authorized backend methods can act on trade proposals. REST/UI may **not** 
   docs/                    # ADRs, incident runbook, model cards, real validation evidence
 ```
 
-Dependency direction: `domain` has no dependency on infra/SDK/framework; `application` depends only on domain/ports; adapters implement ports; server composes DI; browser never imports server credential modules. Enforce import boundaries and compile-time/CI guards against a live write path in I1–I5. SDK object types do not leak into domain.
+Dependency direction: `domain` has no dependency on infra/SDK/framework; `application` depends only on domain/ports; adapters implement ports; server composes DI; browser never imports server credential modules. The I1 scaffold does not create `model`, `strategies`, or `execution` packages ([ADR 0007](docs/adr/0007-i1-observe-boundaries-and-sdk-proof.md)). Enforce import boundaries and compile-time/CI guards against a live write path in I1–I5. SDK object types do not leak into domain.
 
 ## 15. Global quality gates and iteration deliverables
 
