@@ -1,0 +1,11 @@
+node_modules/
+**/dist/
+**/*.tsbuildinfo
+.tools/
+.pnpm-store/
+coverage/
+.env
+.env.*
+!.env.example
+*.pem
+*.key

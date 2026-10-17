@@ -1,0 +1,30 @@
+{
+  "name": "polymarket-trading-desk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.5.2",
+  "engines": {
+    "node": "24.22.0",
+    "pnpm": "10.5.2"
+  },
+  "scripts": {
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "build:types": "tsc -b",
+    "build": "pnpm check:boundaries && pnpm build:types && pnpm --filter @desk/web build",
+    "typecheck": "pnpm build:types && pnpm --filter @desk/web typecheck",
+    "lint": "eslint apps packages scripts tests && pnpm check:boundaries",
+    "format": "prettier --write apps packages scripts tests package.json pnpm-workspace.yaml tsconfig.json tsconfig.base.json eslint.config.mjs prettier.config.mjs README.md docs/development",
+    "format:check": "prettier --check apps packages scripts tests package.json pnpm-workspace.yaml tsconfig.json tsconfig.base.json eslint.config.mjs prettier.config.mjs README.md docs/development",
+    "test": "pnpm build:types && node --test tests/*.test.mjs",
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm build && pnpm test"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.10.1",
+    "eslint": "10.13.0",
+    "prettier": "3.9.10",
+    "typescript": "6.0.2",
+    "typescript-eslint": "8.71.2"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "packages/domain"
+    },
+    {
+      "path": "packages/application"
+    },
+    {
+      "path": "packages/polymarket-adapter"
+    },
+    {
+      "path": "packages/market-data"
+    },
+    {
+      "path": "packages/persistence"
+    },
+    {
+      "path": "packages/shared-contracts"
+    },
+    {
+      "path": "apps/server"
+    }
+  ]
+}
