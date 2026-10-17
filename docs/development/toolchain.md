@@ -17,6 +17,8 @@ Reviewed **2026-10-17** for issue #3. Version pins are deliberate; package insta
 
 ## SDK review and remaining proof
 
+Issue #4 adds exact dev-only `selfsigned` **5.5.0** for local certificate generation and deterministic TLS fixtures. Its asynchronous API is used with explicit RSA/SHA256 and IP SAN settings. It does not run inside the browser or create exchange keys. The lockfile records its dependency closure; installation still requires no lifecycle scripts. See the [upstream API documentation](https://github.com/jfromaniello/selfsigned).
+
 The official SDK package changelog for 0.13.0 was reviewed. It includes changes to indexed approval reads and stream metadata, as well as experimental trading surfaces outside this app's scope. The adapter package pins the dependency but exports only an unconfigured read-only descriptor. No SDK object/type enters domain or browser code, and no client, wallet or key is instantiated.
 
 Issue #16 must prove supported private reads using actual supplied L2 credentials without a private order signer. That remains **not run**. There are no official GitHub Releases on the repository release page at review time; the package changelog and published package metadata are the review sources.

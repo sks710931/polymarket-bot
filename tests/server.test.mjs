@@ -3,7 +3,7 @@ import test from 'node:test';
 import { createServer } from '../apps/server/dist/index.js';
 
 test('server composition is OBSERVE and all adapters are explicitly unconfigured', async () => {
-  const { server, application } = createServer();
+  const { server, application } = await createServer();
   try {
     assert.equal(application.mode, 'OBSERVE');
     assert.deepEqual(

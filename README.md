@@ -1,6 +1,6 @@
 # Polymarket Trading Desk
 
-A local, single-operator BTC five-minute observation desk. This checkout implements the **issue #3 workspace scaffold**, not a running trading product.
+A local, single-operator BTC five-minute observation desk. This checkout provides the workspace scaffold and **issue #4 local HTTPS runtime**. The UI is still a static scaffold; authentication, SQL connectivity and market feeds are later work.
 
 ## Prerequisites
 
@@ -37,7 +37,9 @@ pnpm test
 
 `typecheck` first builds the backend/library project references and declarations, then checks the browser project. `build` also bundles the browser with Vite. Library and server output is emitted into each workspace's `dist/`; the browser bundle is `apps/web/dist/`.
 
-There is deliberately no operator-facing `dev` or `start` command yet. [Issue #4](https://github.com/sks710931/polymarket-bot/issues/4) owns the canonical HTTPS origin, local configuration and development proxy. `createServer()` creates an unbound Fastify instance with no registered routes. It does not claim liveness/readiness, connect an account or make an exchange call.
+For local startup, follow the [Windows HTTPS setup guide](docs/development/local-https.md): generate and trust the loopback certificate, copy `.env.example` to `.env`, and fill the required server configuration. Then use `pnpm build` followed by `pnpm start`, or `pnpm dev`. Both expose the UI at **https://127.0.0.1:8443** by default. Fastify owns the HTTPS origin; the development Vite helper binds only to `127.0.0.1:5173`. Reload the browser after source edits; HMR is disabled.
+
+The async `createServer()` factory can also create an unbound test instance. The runtime validates configuration and TLS before listening. It does not claim liveness/readiness, connect an account or make an exchange call. See [issue #4 validation evidence](docs/development/issue-4-validation.md).
 
 ## Workspaces
 
@@ -60,6 +62,6 @@ Libraries expose only typed ESM package entry points. Import them as `@desk/doma
 
 All runtime descriptors are explicitly `not-configured`. The server does not import or instantiate the SDK; installing an SDK containing signing/write exports is not authority to use those exports. The scaffold guard rejects known exchange-writer/paper identifiers, and runtime smoke tests verify that representative order/paper/live routes are absent. These are bounded regression checks, not a proof against arbitrary malicious code; changes to the checker or adapter still require review.
 
-Real API schemas, SQL connectivity, authentication, feeds, SDK/L2 private-read compatibility and the HTTPS proxy are separate issues. No live or paper execution, order signing, key provisioning, fabricated market values or bot PnL is implemented.
+Real API schemas, SQL connectivity, authentication, feeds and SDK/L2 private-read compatibility are separate issues. No live or paper execution, order signing, key provisioning, fabricated market values or bot PnL is implemented.
 
 See [Architecture.md](Architecture.md), [the I1 plan](Iteration-1-Implementation-Plan.md), [UX.md](UX.md) and [accepted ADRs](docs/adr/README.md).

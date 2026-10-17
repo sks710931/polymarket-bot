@@ -216,7 +216,12 @@ export function checkWorkspace({ sources = {}, manifests = {} } = {}) {
         const specifier = literal.text;
         const name = packageName(specifier);
         if (builtins.has(specifier.replace(/^node:/, ''))) {
+          const viteConfigUrl =
+            directory === 'apps/web' &&
+            relative === 'apps/web/vite.config.ts' &&
+            specifier === 'node:url';
           if (
+            !viteConfigUrl &&
             ![
               'apps/server',
               'packages/polymarket-adapter',
